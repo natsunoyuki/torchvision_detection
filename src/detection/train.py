@@ -21,7 +21,6 @@ import datetime
 import os
 import time
 
-import presets
 import torch
 import torch.utils.data
 import torchvision
@@ -29,6 +28,7 @@ import torchvision.models.detection
 import torchvision.models.detection.mask_rcnn
 from torchvision.transforms import InterpolationMode
 
+from . import presets
 from . import utils
 from .coco_utils import get_coco, get_coco_kp
 from .engine import train_one_epoch, evaluate
