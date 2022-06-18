@@ -11,7 +11,9 @@ pip install git+https://github.com/natsunoyuki/torchvision_detection
 
 # Usage
 ```
+import detection
 
+dataset = detection.coco_utils.get_coco(root, image_set, transform, mode = "instances")
 ```
 
 # References
