@@ -9,6 +9,10 @@ from . import utils
 from .coco_eval import CocoEvaluator
 from .coco_utils import get_coco_api_from_dataset
 
+# These are functions involved with training the deep learning model.
+# These functions are actively used in train.py to handle the entire 
+# training process.
+
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, scaler=None):
     model.train()

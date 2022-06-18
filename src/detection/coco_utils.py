@@ -5,10 +5,13 @@ import torch
 import torch.utils.data
 import torchvision
 
-from . import transforms as T
-
 from pycocotools import mask as coco_mask
 from pycocotools.coco import COCO
+
+from . import transforms as T
+
+# These are functions which handle the loading of the MS COCO 2017 images 
+# as a torch Dataset for input into a deep learning model.
 
 
 class FilterAndRemapCocoCategories:

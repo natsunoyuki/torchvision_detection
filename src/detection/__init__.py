@@ -1,5 +1,9 @@
 # __init__.py
 
+# These are reference scripts used to train torchvision models, 
+# originally provided at:
+# https://github.com/pytorch/vision/tree/main/references/detection
+
 from . import coco_eval
 from . import coco_utils
 from . import engine
