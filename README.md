@@ -3,7 +3,7 @@
 
 ### Torchvision Training References
 These functions and scripts are not part of the `torch` package, and are originally obtained from:
-https://github.com/pytorch/vision/tree/main/references/detection
+https://github.com/pytorch/vision/tree/v0.12.0/references/detection
 
 ### Modern Computer Vision with PyTorch Scripts
 These functions are originally from the GitHub repository of Modern Computer Vision with PyTorch by V Kishore Ayyadevara and Yeshwanth Reddy:
@@ -24,6 +24,6 @@ dataset = detection.coco_utils.get_coco(root, image_set, transform, mode = "inst
 # References
 https://pytorch.org/vision/stable/training_references.html
 
-https://github.com/pytorch/vision/tree/main/references/detection
+https://github.com/pytorch/vision/tree/v0.12.0/references/detection
 
 https://github.com/PacktPublishing/Modern-Computer-Vision-with-PyTorch/blob/master/Chapter08/Training_Faster_RCNN.ipynb
