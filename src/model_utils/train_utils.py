@@ -36,7 +36,7 @@ def validate_batch(inputs, model, optimizer, device):
 
     return loss, losses
 
-def train_fasterrcnn(model, optimizer, n_epochs, train_loader, test_loader = None, log = None):
+def train_fasterrcnn(model, optimizer, n_epochs, train_loader, test_loader = None, log = None, device = "cpu"):
     if log is None:
         log = Report(n_epochs)
 
@@ -44,7 +44,7 @@ def train_fasterrcnn(model, optimizer, n_epochs, train_loader, test_loader = Non
         # Train pass.
         n = len(train_loader)
         for ix, inputs in enumerate(train_loader):
-            loss, losses = train_batch(inputs, model, optimizer)
+            loss, losses = train_batch(inputs, model, optimizer, device)
             loc_loss, regr_loss, loss_objectness, loss_rpn_box_reg = [losses[k] for k in OUTPUT_KEYS]
             pos = (epoch + (ix + 1) / n)
             log.record(pos, trn_loss = loss.item(), trn_loc_loss = loc_loss.item(), 
@@ -55,7 +55,7 @@ def train_fasterrcnn(model, optimizer, n_epochs, train_loader, test_loader = Non
             # Test pass.
             n = len(test_loader)
             for ix,inputs in enumerate(test_loader):
-                loss, losses = validate_batch(inputs, model)
+                loss, losses = validate_batch(inputs, model, optimizer, device)
                 loc_loss, regr_loss, loss_objectness, loss_rpn_box_reg = [losses[k] for k in OUTPUT_KEYS]
                 pos = (epoch + (ix + 1) / n)
                 log.record(pos, val_loss = loss.item(), val_loc_loss = loc_loss.item(), 
