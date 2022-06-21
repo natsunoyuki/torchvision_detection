@@ -5,13 +5,10 @@ import torch
 import torch.utils.data
 import torchvision
 
-from pycocotools import mask as coco_mask
-from pycocotools.coco import COCO
-
 from . import transforms as T
 
-# These are functions which handle the loading of the MS COCO 2017 images 
-# as a torch Dataset for input into a deep learning model.
+from pycocotools import mask as coco_mask
+from pycocotools.coco import COCO
 
 
 class FilterAndRemapCocoCategories:
@@ -131,10 +128,7 @@ def _coco_remove_images_without_annotations(dataset, cat_list=None):
             return True
         return False
 
-    if not isinstance(dataset, torchvision.datasets.CocoDetection):
-        raise TypeError(
-            f"This function expects dataset of type torchvision.datasets.CocoDetection, instead  got {type(dataset)}"
-        )
+    assert isinstance(dataset, torchvision.datasets.CocoDetection)
     ids = []
     for ds_idx, img_id in enumerate(dataset.ids):
         ann_ids = dataset.coco.getAnnIds(imgIds=img_id, iscrowd=None)

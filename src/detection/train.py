@@ -1,17 +1,12 @@
 r"""PyTorch Detection Training.
-
 To run in a multi-gpu environment, use the distributed launcher::
-
     python -m torch.distributed.launch --nproc_per_node=$NGPU --use_env \
         train.py ... --world-size $NGPU
-
 The default hyperparameters are tuned for training on 8 gpus and 2 images per gpu.
     --lr 0.02 --batch-size 2 --world-size 8
 If you use different number of gpus, the learning rate should be changed to 0.02/8*$NGPU.
-
 On top of that, for training Faster/Mask R-CNN, the default hyperparameters are
     --epochs 26 --lr-steps 16 22 --aspect-ratio-group-factor 3
-
 Also, if you train Keypoint R-CNN, the default hyperparameters are
     --epochs 46 --lr-steps 36 43 --aspect-ratio-group-factor 3
 Because the number of images is smaller in the person keypoint subset of COCO,
@@ -21,21 +16,22 @@ import datetime
 import os
 import time
 
+from . import presets
 import torch
 import torch.utils.data
 import torchvision
 import torchvision.models.detection
 import torchvision.models.detection.mask_rcnn
-from torchvision.transforms import InterpolationMode
-
-from . import presets
 from . import utils
 from .coco_utils import get_coco, get_coco_kp
 from .engine import train_one_epoch, evaluate
 from .group_by_aspect_ratio import GroupedBatchSampler, create_aspect_ratio_groups
-from .transforms import SimpleCopyPaste
 
-# These is the main driver script for training a torch deep learning object detection model.
+
+try:
+    from torchvision import prototype
+except ImportError:
+    prototype = None
 
 
 def get_dataset(name, image_set, transform, data_path):
@@ -48,13 +44,15 @@ def get_dataset(name, image_set, transform, data_path):
 
 def get_transform(train, args):
     if train:
-        return presets.DetectionPresetTrain(data_augmentation=args.data_augmentation)
-    elif args.weights and args.test_only:
-        weights = torchvision.models.get_weight(args.weights)
-        trans = weights.transforms()
-        return lambda img, target: (trans(img), target)
-    else:
+        return presets.DetectionPresetTrain(args.data_augmentation)
+    elif not args.prototype:
         return presets.DetectionPresetEval()
+    else:
+        if args.weights:
+            weights = prototype.models.get_weight(args.weights)
+            return weights.transforms()
+        else:
+            return prototype.transforms.CocoEval()
 
 
 def get_args_parser(add_help=True):
@@ -73,7 +71,6 @@ def get_args_parser(add_help=True):
     parser.add_argument(
         "-j", "--workers", default=4, type=int, metavar="N", help="number of data loading workers (default: 4)"
     )
-    parser.add_argument("--opt", default="sgd", type=str, help="optimizer")
     parser.add_argument(
         "--lr",
         default=0.02,
@@ -89,12 +86,6 @@ def get_args_parser(add_help=True):
         metavar="W",
         help="weight decay (default: 1e-4)",
         dest="weight_decay",
-    )
-    parser.add_argument(
-        "--norm-weight-decay",
-        default=None,
-        type=float,
-        help="weight decay for Normalization layers (default: None, same value as --wd)",
     )
     parser.add_argument(
         "--lr-scheduler", default="multisteplr", type=str, help="name of lr scheduler (default: multisteplr)"
@@ -136,31 +127,37 @@ def get_args_parser(add_help=True):
         help="Only test the model",
         action="store_true",
     )
-
     parser.add_argument(
-        "--use-deterministic-algorithms", action="store_true", help="Forces the use of deterministic algorithms only."
+        "--pretrained",
+        dest="pretrained",
+        help="Use pre-trained models from the modelzoo",
+        action="store_true",
     )
 
     # distributed training parameters
     parser.add_argument("--world-size", default=1, type=int, help="number of distributed processes")
     parser.add_argument("--dist-url", default="env://", type=str, help="url used to set up distributed training")
+
+    # Prototype models only
+    parser.add_argument(
+        "--prototype",
+        dest="prototype",
+        help="Use prototype model builders instead those from main area",
+        action="store_true",
+    )
     parser.add_argument("--weights", default=None, type=str, help="the weights enum name to load")
-    parser.add_argument("--weights-backbone", default=None, type=str, help="the backbone weights enum name to load")
 
     # Mixed precision training parameters
     parser.add_argument("--amp", action="store_true", help="Use torch.cuda.amp for mixed precision training")
-
-    # Use CopyPaste augmentation training parameter
-    parser.add_argument(
-        "--use-copypaste",
-        action="store_true",
-        help="Use CopyPaste data augmentation. Works only with data-augmentation='lsj'.",
-    )
 
     return parser
 
 
 def main(args):
+    if args.prototype and prototype is None:
+        raise ImportError("The prototype module couldn't be found. Please install the latest torchvision nightly.")
+    if not args.prototype and args.weights:
+        raise ValueError("The weights parameter works only in prototype mode. Please pass the --prototype argument.")
     if args.output_dir:
         utils.mkdir(args.output_dir)
 
@@ -168,9 +165,6 @@ def main(args):
     print(args)
 
     device = torch.device(args.device)
-
-    if args.use_deterministic_algorithms:
-        torch.use_deterministic_algorithms(True)
 
     # Data loading code
     print("Loading data")
@@ -181,7 +175,7 @@ def main(args):
     print("Creating data loaders")
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(dataset)
-        test_sampler = torch.utils.data.distributed.DistributedSampler(dataset_test, shuffle=False)
+        test_sampler = torch.utils.data.distributed.DistributedSampler(dataset_test)
     else:
         train_sampler = torch.utils.data.RandomSampler(dataset)
         test_sampler = torch.utils.data.SequentialSampler(dataset_test)
@@ -192,20 +186,8 @@ def main(args):
     else:
         train_batch_sampler = torch.utils.data.BatchSampler(train_sampler, args.batch_size, drop_last=True)
 
-    train_collate_fn = utils.collate_fn
-    if args.use_copypaste:
-        if args.data_augmentation != "lsj":
-            raise RuntimeError("SimpleCopyPaste algorithm currently only supports the 'lsj' data augmentation policies")
-
-        copypaste = SimpleCopyPaste(resize_interpolation=InterpolationMode.BILINEAR, blending=True)
-
-        def copypaste_collate_fn(batch):
-            return copypaste(*utils.collate_fn(batch))
-
-        train_collate_fn = copypaste_collate_fn
-
     data_loader = torch.utils.data.DataLoader(
-        dataset, batch_sampler=train_batch_sampler, num_workers=args.workers, collate_fn=train_collate_fn
+        dataset, batch_sampler=train_batch_sampler, num_workers=args.workers, collate_fn=utils.collate_fn
     )
 
     data_loader_test = torch.utils.data.DataLoader(
@@ -214,14 +196,15 @@ def main(args):
 
     print("Creating model")
     kwargs = {"trainable_backbone_layers": args.trainable_backbone_layers}
-    if args.data_augmentation in ["multiscale", "lsj"]:
-        kwargs["_skip_resize"] = True
     if "rcnn" in args.model:
         if args.rpn_score_thresh is not None:
             kwargs["rpn_score_thresh"] = args.rpn_score_thresh
-    model = torchvision.models.detection.__dict__[args.model](
-        weights=args.weights, weights_backbone=args.weights_backbone, num_classes=num_classes, **kwargs
-    )
+    if not args.prototype:
+        model = torchvision.models.detection.__dict__[args.model](
+            pretrained=args.pretrained, num_classes=num_classes, **kwargs
+        )
+    else:
+        model = prototype.models.detection.__dict__[args.model](weights=args.weights, num_classes=num_classes, **kwargs)
     model.to(device)
     if args.distributed and args.sync_bn:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
@@ -231,26 +214,8 @@ def main(args):
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
 
-    if args.norm_weight_decay is None:
-        parameters = [p for p in model.parameters() if p.requires_grad]
-    else:
-        param_groups = torchvision.ops._utils.split_normalization_params(model)
-        wd_groups = [args.norm_weight_decay, args.weight_decay]
-        parameters = [{"params": p, "weight_decay": w} for p, w in zip(param_groups, wd_groups) if p]
-
-    opt_name = args.opt.lower()
-    if opt_name.startswith("sgd"):
-        optimizer = torch.optim.SGD(
-            parameters,
-            lr=args.lr,
-            momentum=args.momentum,
-            weight_decay=args.weight_decay,
-            nesterov="nesterov" in opt_name,
-        )
-    elif opt_name == "adamw":
-        optimizer = torch.optim.AdamW(parameters, lr=args.lr, weight_decay=args.weight_decay)
-    else:
-        raise RuntimeError(f"Invalid optimizer {args.opt}. Only SGD and AdamW are supported.")
+    params = [p for p in model.parameters() if p.requires_grad]
+    optimizer = torch.optim.SGD(params, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
     scaler = torch.cuda.amp.GradScaler() if args.amp else None
 
@@ -274,7 +239,6 @@ def main(args):
             scaler.load_state_dict(checkpoint["scaler"])
 
     if args.test_only:
-        torch.backends.cudnn.deterministic = True
         evaluate(model, data_loader_test, device=device)
         return
 

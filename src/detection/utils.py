@@ -7,8 +7,6 @@ from collections import defaultdict, deque
 import torch
 import torch.distributed as dist
 
-# These are utility functions to make life easier when training the model.
-
 
 class SmoothedValue:
     """Track a series of values and provide access to smoothed values over a

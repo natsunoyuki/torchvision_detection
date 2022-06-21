@@ -6,19 +6,15 @@ import numpy as np
 import pycocotools.mask as mask_util
 import torch
 
-from pycocotools.coco import COCO
-from pycocotools.cocoeval import COCOeval
-
 from . import utils
 
-# These are functions which evaluate a torch object detection/instance segmentation 
-# model (faster-rcnn or mask-rcnn) on the MS COCO 2017 dataset.
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
 
 
 class CocoEvaluator:
     def __init__(self, coco_gt, iou_types):
-        if not isinstance(iou_types, (list, tuple)):
-            raise TypeError(f"This constructor expects iou_types of type list or tuple, instead  got {type(iou_types)}")
+        assert isinstance(iou_types, (list, tuple))
         coco_gt = copy.deepcopy(coco_gt)
         self.coco_gt = coco_gt
 
