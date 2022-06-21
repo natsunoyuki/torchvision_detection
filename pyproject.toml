@@ -2,7 +2,7 @@
 requires = ["setuptools>=42", 
             "torch~=1.11.0", 
             "torchvision~=0.12.0", 
-            "torch_snippets", 
+            "torch-snippets", 
             "pycocotools", 
             "numpy", 
             "Pillow"]
