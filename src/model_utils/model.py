@@ -1,12 +1,23 @@
-# https://pytorch.org/tutorials/intermediate/torchvision_tutorial.html
-
-import torchvision
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
+from torchvision.models.detection import fasterrcnn_resnet50_fpn
+from torchvision.models.detection import maskrcnn_resnet50_fpn
 
 
-def get_model_instance_segmentation(num_classes = 2):
-    model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained = True)
+################################################################################
+# These are helper functions used to download the faster rcnn object detection
+# model and the mask rcnn segmentation model from torchvision.
+# Original Python code from:
+# https://pytorch.org/tutorials/intermediate/torchvision_tutorial.html
+################################################################################
+
+def get_model_instance_segmentation(num_classes = 2, feature_extraction = True):
+    model = maskrcnn_resnet50_fpn(pretrained = True)
+
+    if feature_extraction == True:
+        for p in model.parameters():
+            p.requires_grad = False
+
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
@@ -15,12 +26,15 @@ def get_model_instance_segmentation(num_classes = 2):
     model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask,
                                                        hidden_layer,
                                                        num_classes)
-
     return model
 
-def get_model_object_detection(num_classes = 2):
-    model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained = True)
+def get_model_object_detection(num_classes = 2, feature_extraction = True):
+    model = fasterrcnn_resnet50_fpn(pretrained = True)
+
+    if feature_extraction == True:
+        for p in model.parameters():
+            p.requires_grad = False
+
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-
     return model
