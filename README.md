@@ -23,7 +23,7 @@ import model_utils
 dataset = detection.coco_utils.get_coco(root, image_set, transform, mode = "instances")
 
 # Fasterrcnn model.
-model = model_utils.model.fasterrcnn(num_classes = 2)
+model = fasterrcnn_utils.model.fasterrcnn(num_classes = 2)
 ```
 
 # References
