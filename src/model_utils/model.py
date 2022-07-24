@@ -11,7 +11,18 @@ from torchvision.models.detection import maskrcnn_resnet50_fpn
 # https://pytorch.org/tutorials/intermediate/torchvision_tutorial.html
 ################################################################################
 
-def get_model_instance_segmentation(num_classes = 2, feature_extraction = True):
+def fasterrcnn(num_classes = 2, feature_extraction = True):
+    model = fasterrcnn_resnet50_fpn(pretrained = True)
+
+    if feature_extraction == True:
+        for p in model.parameters():
+            p.requires_grad = False
+
+    in_features = model.roi_heads.box_predictor.cls_score.in_features
+    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+    return model
+
+def maskrcnn(num_classes = 2, feature_extraction = True):
     model = maskrcnn_resnet50_fpn(pretrained = True)
 
     if feature_extraction == True:
@@ -28,13 +39,3 @@ def get_model_instance_segmentation(num_classes = 2, feature_extraction = True):
                                                        num_classes)
     return model
 
-def get_model_object_detection(num_classes = 2, feature_extraction = True):
-    model = fasterrcnn_resnet50_fpn(pretrained = True)
-
-    if feature_extraction == True:
-        for p in model.parameters():
-            p.requires_grad = False
-
-    in_features = model.roi_heads.box_predictor.cls_score.in_features
-    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-    return model
